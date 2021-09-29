@@ -25,17 +25,26 @@
 #define pot2 26
 
 #define Boton1 14
-#define Boton2 12
+#define Boton2 13
 
-#define led1 25 //verde
-#define led2 13 //rojo
+//leds
+#define ledR 25
+#define ledG 33
+#define ledB 32
+#define pwmChannelR 5 // 16 canales 0-15
+#define pwmChannelG 4
+#define pwmChannelB 3
+#define freqPWM 5000 // Frecuencia en Hz
+#define resolution 8 // 1-16 bits de resolución
+
 //*****************************************************************************
 // Prototipos de función
 //*****************************************************************************
 void separarvariables1(void);
 void separarvariables2(void);
 void contBitsSuma(void);
-//void contBitsResta(void);
+void configurarPWM(void);
+void leds(void);
 //*****************************************************************************
 // Variables Globales
 //*****************************************************************************
@@ -48,12 +57,20 @@ int volt1;
 float voltaje2;
 int volt2;
 
+//variables para valores de los leds
+float potLedR = 0;
+float potLedG = 0;
+
 //Instanciar timer
 hw_timer_t *timer = NULL;
 //variable para el contador del timer
 int ISRB1 = 0;
 int ISRB2 = 0;
-int contadorDisplay = 7;
+int contadorDisplay = 0;
+
+//delay1
+unsigned long lastTime;
+unsigned int sampleTime = 500;//el delay dura 500 milisegundos
 
 //*****************************************************************************
 //ISR
@@ -77,18 +94,20 @@ void IRAM_ATTR boton2()
 
 void setup() {
   //leds
-  pinMode(led1, OUTPUT);
-  pinMode(led2, OUTPUT);
-  digitalWrite(led1, 0);
-  digitalWrite(led2, 0);
+  pinMode(ledR, OUTPUT);
+  pinMode(ledG, OUTPUT);
+  digitalWrite(ledR, 0);
+  digitalWrite(ledG, 0);
   //boton1
-  //pinMode(Boton1, INPUT_PULLUP);
+  pinMode(Boton1, INPUT_PULLUP);
   attachInterrupt(Boton1, boton1, RISING);
 
   //boton2
-  //pinMode(Boton2, INPUT_PULLUP);
+  pinMode(Boton2, INPUT_PULLUP);
   attachInterrupt(Boton2, boton2, RISING);
-  
+
+  //pwm
+  configurarPWM();
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   // Print a message to the LCD.
@@ -98,12 +117,15 @@ void setup() {
   lcd.setCursor(12, 0);
   lcd.print("CPU");
 }
+//*****************************************************************************
+// Loop principal
+//*****************************************************************************
 
 void loop() {
-  contBitsSuma();
-  //contBitsResta();
+  contBitsSuma();//hace la suma y resta con los botones
   separarvariables1();
   separarvariables2();
+  leds();
   // set the cursor to column 0, line 1
   // (note: line 1 is the second row, since counting begins with 0):
   lcd.setCursor(0, 1);
@@ -118,67 +140,120 @@ void loop() {
   // print the number of seconds since reset:
   lcd.print(contadorDisplay);
 }
+//*****************************************************************************
+//*****************************************************************************
+// funciones
+//*****************************************************************************
+//*****************************************************************************
 
+//*****************************************************************************
+// funcione para configurar el PWM
+//*****************************************************************************
+void configurarPWM(void)
+{
+
+  // Paso 1: Configurar el módulo PWM
+  ledcSetup(pwmChannelR, freqPWM, resolution);//ledR
+  ledcSetup(pwmChannelG, freqPWM, resolution);//legG
+  ledcSetup(pwmChannelB, freqPWM, resolution);//ledB
+
+  // Paso 2: seleccionar en que GPIO tendremos nuestra señal PWM
+  ledcAttachPin(ledR, pwmChannelR);
+  ledcAttachPin(ledG, pwmChannelG);
+  ledcAttachPin(ledB, pwmChannelB);
+
+}
+
+//*****************************************************************************
+//Funcion Leds
+//*****************************************************************************
+void leds()
+{
+  
+  /**
+   * ya que el led RGB es de anodo comun, se debe colocar 0 en el ledcWrite 
+   * que se desea encender .
+   * Esta funcion la saque de la que use en el codigo de mi proyecto1 ubicado 
+   * en pruebasproyecto.
+   */
+  ledcWrite(pwmChannelR, potLedR);//se muestra color verde
+  ledcWrite(pwmChannelG, potLedG);
+  ledcWrite(pwmChannelB, 255);
+}
+
+//*****************************************************************************
+//Funcion para leer el voltaje del pot1
+//*****************************************************************************
 void separarvariables1(){
-  voltaje1 = analogReadMilliVolts(pot1)/1000.0 ;
-  int temp = voltaje1;
+  voltaje1 = analogReadMilliVolts(pot1)/1000.0 ;//al dividirlo da el valor en 
+  //volios
+  potLedR = (voltaje1/3.15)*255;//divide voltaje1 para obtener un valor entre
+  //0 y 1 y lo multiplica por 255 para obtener valores entre 0 y 255 para el 
+  //led 
+
+
+  /*int temp = voltaje1;
   decenas = temp / 100.0;
   temp = temp - decenas *100.0;
   unidades = temp / 10.0;
   temp = temp - unidades *10.0;
   decimal = temp;
-  volt1 = decenas + unidades + decimal;
+  volt1 = decenas + unidades + decimal;*/
 }
 
+//*****************************************************************************
+//Funcion para leer el voltaje del pot1
+//*****************************************************************************
 void separarvariables2(){
-  voltaje2 = analogReadMilliVolts(pot2)/1000.0;
-  int temp = voltaje2;
+  voltaje2 = analogReadMilliVolts(pot2)/1000.0;//al dividirlo da el valor en 
+  //volios
+
+  potLedG = (voltaje2/3.14)*255;//divide voltaje2 para obtener un valor entre
+  //0 y 1 y lo multiplica por 255 para obtener valores entre 0 y 255 para el 
+  //led
+
+
+ /* int temp = voltaje2;
   decenas = temp / 100.0;
   temp = temp - decenas *100.0;
   unidades = temp / 10.0;
   temp = temp - unidades *10.0;
   decimal = temp;
-  volt2 = decenas + unidades + decimal;
+  volt2 = decenas + unidades + decimal;*/
 }
 
+//*****************************************************************************
+//Funcion para realizar la suma y resta con los botones
+//*****************************************************************************
 void contBitsSuma(){
   if (ISRB1 == 1 && contadorDisplay < 255){
-    contadorDisplay = contadorDisplay + 1 ;
-    digitalWrite(led1, 1);
-   ISRB1 = 0;
+    if(millis() - lastTime >= sampleTime){
+      lastTime = millis(); //el if es un delay de 500milisegundos
+      contadorDisplay = contadorDisplay + 1 ;
+      ISRB1 = 0;
+    }  
   }
 
   if (ISRB1 == 1 && contadorDisplay == 255){
-    contadorDisplay = 255 ;
-    digitalWrite(led1, 1);
-    ISRB1 = 0;
+    if(millis() - lastTime >= sampleTime){
+      lastTime = millis(); //el if es un delay de 500milisegundos  
+      contadorDisplay = 255 ;
+      ISRB1 = 0;
+    }  
   }
 
   if (ISRB2 > 0 && contadorDisplay > 0){
-    contadorDisplay = contadorDisplay - 1 ;
-     digitalWrite(led2, 1);
-     ISRB2 = 0;
+    if(millis() - lastTime >= sampleTime){
+      lastTime = millis(); //el if es un delay de 500milisegundos
+      contadorDisplay = contadorDisplay - 1 ;
+      ISRB2 = 0;
+    }  
   }
   if (ISRB2 == 1 && contadorDisplay == 0){
-    contadorDisplay = 0 ;
-     digitalWrite(led2, 1);
-     ISRB2 = 0;
-    
-  }
-  
+    if(millis() - lastTime >= sampleTime){
+      lastTime = millis(); //el if es un delay de 500milisegundos  
+      contadorDisplay = 0 ;
+      ISRB2 = 0;
+    }  
+  }  
 }
-/*
-void contBitsResta(){
-  if (ISRB2 == 1 && contadorDisplay > 0){
-    contadorDisplay = contadorDisplay - 1 ;
-     digitalWrite(led2, 1);
-     ISRB2 = 0;
-  }
-  if (ISRB2 == 1 && contadorDisplay == 0){
-    contadorDisplay = 0 ;
-     digitalWrite(led2, 1);
-     ISRB2 = 0;
-    
-  }
-  
-}*/
