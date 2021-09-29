@@ -14,8 +14,9 @@
 //*****************************************************************************
 // Definición de pines
 //*****************************************************************************
-#define d4 3
-#define d5 1
+#define d4 19//los GPIO 1 y 3 se dejan libres porque son los que usa la 
+//comnicacion serial
+#define d5 21
 #define d6 22
 #define d7 23
 #define en 16
@@ -45,6 +46,7 @@ void separarvariables2(void);
 void contBitsSuma(void);
 void configurarPWM(void);
 void leds(void);
+void comSerial(void);
 //*****************************************************************************
 // Variables Globales
 //*****************************************************************************
@@ -72,6 +74,11 @@ int contadorDisplay = 0;
 unsigned long lastTime;
 unsigned int sampleTime = 500;//el delay dura 500 milisegundos
 
+//USART
+char inByte = 0;
+String mensaje = "";
+
+
 //*****************************************************************************
 //ISR
 //*****************************************************************************
@@ -93,6 +100,8 @@ void IRAM_ATTR boton2()
 //*****************************************************************************
 
 void setup() {
+  Serial.begin(115200);
+
   //leds
   pinMode(ledR, OUTPUT);
   pinMode(ledG, OUTPUT);
@@ -126,6 +135,7 @@ void loop() {
   separarvariables1();
   separarvariables2();
   leds();
+  comSerial();
   // set the cursor to column 0, line 1
   // (note: line 1 is the second row, since counting begins with 0):
   lcd.setCursor(0, 1);
@@ -256,4 +266,21 @@ void contBitsSuma(){
       ISRB2 = 0;
     }  
   }  
+}
+
+//*****************************************************************************
+// funcion para comunicacion serial
+//*****************************************************************************
+void comSerial(){
+    if(Serial.available()>0){
+    
+      //inByte = Serial.read();  // Lectura por bytes
+      mensaje = Serial.readStringUntil('\n');
+      
+      //Serial.print("Recibi el siguiente dato: ");
+      //Serial.println(inByte);
+
+      Serial.print("Recibi el siguiente mensaje: ");
+      Serial.println(mensaje);
+    }
 }
